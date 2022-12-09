@@ -9,8 +9,43 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Logger logger
-var Logger *zap.Logger
+type ZLogger struct {
+	zap.Logger
+}
+
+func (l *ZLogger) Debugf(format string, a ...any) {
+	l.Debug(fmt.Sprintf(format, a...))
+}
+
+func (l *ZLogger) Infof(format string, a ...any) {
+	l.Info(fmt.Sprintf(format, a...))
+}
+
+func (l *ZLogger) Warnf(format string, a ...any) {
+	l.Warn(fmt.Sprintf(format, a...))
+}
+
+func (l *ZLogger) Errorf(format string, a ...any) {
+	l.Error(fmt.Sprintf(format, a...))
+}
+
+func (l *ZLogger) Fatalf(format string, a ...any) {
+	l.Fatal(fmt.Sprintf(format, a...))
+}
+
+func (l *ZLogger) Panicf(format string, a ...any) {
+	l.Panic(fmt.Sprintf(format, a...))
+}
+
+func (l *ZLogger) DPanicf(format string, a ...any) {
+	l.DPanic(fmt.Sprintf(format, a...))
+}
+
+// Logger logger接口实例
+var Logger *ZLogger
+
+// MLogger 通过包名直接调用
+var MLogger *ZLogger
 
 // GoidCallerEncoder caller中增加Goroutine ID
 func GoidCallerEncoder(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder) {
@@ -20,17 +55,18 @@ func GoidCallerEncoder(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEnc
 
 func init() {
 	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "time",
-		LevelKey:       "LEVEL",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalColorLevelEncoder, // 这里可以指定颜色
-		EncodeTime:     zapcore.ISO8601TimeEncoder,       // ISO8601 UTC 时间格式
-		EncodeDuration: zapcore.SecondsDurationEncoder,
-		EncodeCaller:   GoidCallerEncoder, // 全路径编码器
+		TimeKey:          "time",
+		LevelKey:         "LEVEL",
+		NameKey:          "logger",
+		CallerKey:        "caller",
+		MessageKey:       "msg",
+		StacktraceKey:    "stacktrace",
+		LineEnding:       zapcore.DefaultLineEnding,
+		EncodeLevel:      zapcore.CapitalColorLevelEncoder, // 这里可以指定颜色
+		EncodeTime:       zapcore.ISO8601TimeEncoder,       // ISO8601 UTC 时间格式
+		EncodeDuration:   zapcore.SecondsDurationEncoder,
+		EncodeCaller:     GoidCallerEncoder, // 全路径编码器
+		ConsoleSeparator: " ",
 	}
 
 	// 设置日志级别
@@ -44,64 +80,66 @@ func init() {
 	}
 	// 构建日志
 	var err error
-	Logger, err = config.Build(zap.AddCallerSkip(1))
+	logger, err := config.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic(fmt.Sprintf("Logger 初始化失败: %v", err))
 	}
+	Logger = &ZLogger{Logger: *logger}
+	MLogger = &ZLogger{Logger: *logger.WithOptions(zap.AddCallerSkip(1))}
 }
 
 func Debug(msg string, fields ...zap.Field) {
-	Logger.Debug(msg, fields...)
+	MLogger.Debug(msg, fields...)
 }
 
 func Info(msg string, fields ...zap.Field) {
-	Logger.Info(msg, fields...)
+	MLogger.Info(msg, fields...)
 }
 
 func Warn(msg string, fields ...zap.Field) {
-	Logger.Warn(msg, fields...)
+	MLogger.Warn(msg, fields...)
 }
 
 func Error(msg string, fields ...zap.Field) {
-	Logger.Error(msg, fields...)
+	MLogger.Error(msg, fields...)
 }
 
 func Fatal(msg string, fields ...zap.Field) {
-	Logger.Fatal(msg, fields...)
+	MLogger.Fatal(msg, fields...)
 }
 
 func Panic(msg string, fields ...zap.Field) {
-	Logger.Panic(msg, fields...)
+	MLogger.Panic(msg, fields...)
 }
 
 func DPanic(msg string, fields ...zap.Field) {
-	Logger.DPanic(msg, fields...)
+	MLogger.DPanic(msg, fields...)
 }
 
 func Debugf(format string, a ...any) {
-	Logger.Debug(fmt.Sprintf(format, a...))
+	MLogger.Debugf(format, a...)
 }
 
 func Infof(format string, a ...any) {
-	Logger.Info(fmt.Sprintf(format, a...))
+	MLogger.Infof(format, a...)
 }
 
 func Warnf(format string, a ...any) {
-	Logger.Warn(fmt.Sprintf(format, a...))
+	MLogger.Warnf(format, a...)
 }
 
 func Errorf(format string, a ...any) {
-	Logger.Error(fmt.Sprintf(format, a...))
+	MLogger.Errorf(format, a...)
 }
 
 func Fatalf(format string, a ...any) {
-	Logger.Fatal(fmt.Sprintf(format, a...))
+	MLogger.Fatalf(format, a...)
 }
 
 func Panicf(format string, a ...any) {
-	Logger.Panic(fmt.Sprintf(format, a...))
+	MLogger.Panicf(format, a...)
 }
 
 func DPanicf(format string, a ...any) {
-	Logger.DPanic(fmt.Sprintf(format, a...))
+	MLogger.DPanicf(format, a...)
 }
