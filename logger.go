@@ -3,151 +3,84 @@ package zlog
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/v2pro/plz/gls"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-type ZLogger struct {
-	zap.Logger
+func getLumberJackWriter(fileName string) zapcore.WriteSyncer {
+	lumberJackLogger := &lumberjack.Logger{
+		Filename:   fileName,
+		LocalTime:  true,
+		MaxBackups: 5,
+		MaxAge:     1,
+		Compress:   false,
+	}
+	return zapcore.AddSync(lumberJackLogger)
 }
 
-func (l *ZLogger) Debugf(format string, a ...any) {
-	l.Debug(fmt.Sprintf(format, a...))
-}
-
-func (l *ZLogger) Infof(format string, a ...any) {
-	l.Info(fmt.Sprintf(format, a...))
-}
-
-func (l *ZLogger) Warnf(format string, a ...any) {
-	l.Warn(fmt.Sprintf(format, a...))
-}
-
-func (l *ZLogger) Errorf(format string, a ...any) {
-	l.Error(fmt.Sprintf(format, a...))
-}
-
-func (l *ZLogger) Fatalf(format string, a ...any) {
-	l.Fatal(fmt.Sprintf(format, a...))
-}
-
-func (l *ZLogger) Panicf(format string, a ...any) {
-	l.Panic(fmt.Sprintf(format, a...))
-}
-
-func (l *ZLogger) DPanicf(format string, a ...any) {
-	l.DPanic(fmt.Sprintf(format, a...))
-}
-
-// Logger logger接口实例
-var Logger *ZLogger
-
-// MLogger 通过包名直接调用
-var MLogger *ZLogger
-
-var level zap.AtomicLevel
-
-// GoidCallerEncoder caller中增加Goroutine ID
-func GoidCallerEncoder(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder) {
+func goidCallerEncoder(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(fmt.Sprintf("%d,%d", os.Getpid(), gls.GoID()))
 	zapcore.ShortCallerEncoder(caller, enc)
 }
 
-func init() {
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:          "time",
-		LevelKey:         "LEVEL",
-		NameKey:          "logger",
-		CallerKey:        "caller",
-		MessageKey:       "msg",
-		StacktraceKey:    "stacktrace",
-		LineEnding:       zapcore.DefaultLineEnding,
-		EncodeLevel:      zapcore.CapitalColorLevelEncoder, // 这里可以指定颜色
-		EncodeTime:       zapcore.ISO8601TimeEncoder,       // ISO8601 UTC 时间格式
-		EncodeDuration:   zapcore.SecondsDurationEncoder,
-		EncodeCaller:     GoidCallerEncoder, // 全路径编码器
-		ConsoleSeparator: " ",
+func getEncoder(colored bool) zapcore.Encoder {
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+	encoderConfig.EncodeCaller = goidCallerEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	if colored {
+		encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	}
+	return zapcore.NewConsoleEncoder(encoderConfig)
+}
 
-	level = zap.NewAtomicLevelAt(zap.InfoLevel)
-
-	// 设置日志级别
-	config := zap.Config{
-		Level:            level,              // 日志级别
-		Development:      true,               // 开发模式，堆栈跟踪
-		Encoding:         "console",          // 输出格式 console 或 json
-		EncoderConfig:    encoderConfig,      // 编码器配置
-		OutputPaths:      []string{"stdout"}, // 输出到指定文件 stdout（标准输出，正常颜色） stderr（错误输出，红色）
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	// 构建日志
-	var err error
-	logger, err := config.Build(zap.AddCallerSkip(1))
+// MustLogger MustLogger
+func MustLogger(lvl zap.AtomicLevel) *zap.Logger {
+	logger, err := NewLogger(lvl)
 	if err != nil {
-		panic(fmt.Sprintf("Logger 初始化失败: %v", err))
+		panic(err)
 	}
-	Logger = &ZLogger{Logger: *logger}
-	MLogger = &ZLogger{Logger: *logger.WithOptions(zap.AddCallerSkip(1))}
+	return logger
 }
 
-func SetLevel(l zapcore.Level) {
-	level.SetLevel(l)
-}
+// NewLogger NewLogger
+func NewLogger(lvl zap.AtomicLevel) (*zap.Logger, error) {
+	name := filepath.Base(os.Args[0])
+	core := zapcore.NewTee(
+		zapcore.NewCore(
+			getEncoder(false),
+			getLumberJackWriter(fmt.Sprintf("%s.verbose.log", name)),
+			lvl,
+		),
+		zapcore.NewCore(
+			getEncoder(false),
+			getLumberJackWriter(fmt.Sprintf("%s.error.log", name)),
+			zapcore.ErrorLevel,
+		),
+		zapcore.NewCore(
+			getEncoder(true),
+			zapcore.Lock(os.Stdout),
+			lvl,
+		),
+		zapcore.NewCore(
+			getEncoder(true),
+			zapcore.Lock(os.Stderr),
+			zapcore.ErrorLevel,
+		),
+	)
+	wrapCore := func(zapcore.Core) zapcore.Core {
+		return core
+	}
 
-func Debug(msg string, fields ...zap.Field) {
-	MLogger.Debug(msg, fields...)
-}
+	config := zap.NewDevelopmentConfig()
+	config.Development = false
 
-func Info(msg string, fields ...zap.Field) {
-	MLogger.Info(msg, fields...)
-}
-
-func Warn(msg string, fields ...zap.Field) {
-	MLogger.Warn(msg, fields...)
-}
-
-func Error(msg string, fields ...zap.Field) {
-	MLogger.Error(msg, fields...)
-}
-
-func Fatal(msg string, fields ...zap.Field) {
-	MLogger.Fatal(msg, fields...)
-}
-
-func Panic(msg string, fields ...zap.Field) {
-	MLogger.Panic(msg, fields...)
-}
-
-func DPanic(msg string, fields ...zap.Field) {
-	MLogger.DPanic(msg, fields...)
-}
-
-func Debugf(format string, a ...any) {
-	MLogger.Debugf(format, a...)
-}
-
-func Infof(format string, a ...any) {
-	MLogger.Infof(format, a...)
-}
-
-func Warnf(format string, a ...any) {
-	MLogger.Warnf(format, a...)
-}
-
-func Errorf(format string, a ...any) {
-	MLogger.Errorf(format, a...)
-}
-
-func Fatalf(format string, a ...any) {
-	MLogger.Fatalf(format, a...)
-}
-
-func Panicf(format string, a ...any) {
-	MLogger.Panicf(format, a...)
-}
-
-func DPanicf(format string, a ...any) {
-	MLogger.DPanicf(format, a...)
+	return config.Build(
+		zap.WithCaller(true),
+		zap.WrapCore(wrapCore),
+		zap.AddCallerSkip(0),
+	)
 }
