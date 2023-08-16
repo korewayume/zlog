@@ -58,17 +58,19 @@ func NewLogger(lvl zap.AtomicLevel) (*zap.Logger, error) {
 		zapcore.NewCore(
 			getEncoder(false),
 			getLumberJackWriter(fmt.Sprintf("%s.error.log", name)),
-			zapcore.ErrorLevel,
+			zap.ErrorLevel,
 		),
 		zapcore.NewCore(
 			getEncoder(true),
 			zapcore.Lock(os.Stdout),
-			lvl,
+			zap.LevelEnablerFunc(func(level zapcore.Level) bool {
+				return level >= lvl.Level() && level < zap.ErrorLevel
+			}),
 		),
 		zapcore.NewCore(
 			getEncoder(true),
 			zapcore.Lock(os.Stderr),
-			zapcore.ErrorLevel,
+			zap.ErrorLevel,
 		),
 	)
 	wrapCore := func(zapcore.Core) zapcore.Core {
