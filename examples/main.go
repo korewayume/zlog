@@ -7,8 +7,8 @@ import (
 
 func main() {
 	zlog.SetLevel(zap.ErrorLevel)
-	zlog.Debug("1")
-	zlog.Debug("2")
+	zlog.Debug("debug")
 	zlog.SetLevel(zap.DebugLevel)
-	zlog.Debug("3")
+	zlog.Debug("debug")
+	zlog.Error("error")
 }

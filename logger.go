@@ -83,6 +83,6 @@ func NewLogger(lvl zap.AtomicLevel) (*zap.Logger, error) {
 	return config.Build(
 		zap.WithCaller(true),
 		zap.WrapCore(wrapCore),
-		zap.AddCallerSkip(0),
+		zap.AddCallerSkip(1),
 	)
 }
